@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Circle Rotations</title>
+    <title>Planar Cube</title>
 <style>
     .container {
         position: relative;
@@ -46,11 +46,18 @@
             { x: 45, y: 195 },
             { x: 45, y: 75 },
         ];
-
+//       1
+//     /   \
+//   6      2
+//   | \   / |
+//   |   0   |
+//  5   |   3
+//    \  |  /
+//       4
         const rotations = [
-            [2, 1, 6, 0],
-            [4, 3, 2, 0],
-            [6, 5, 4, 0]
+            [0, 6, 1, 2],
+            [0, 2, 3, 4],
+            [0, 4, 5, 6]
         ];
  </script>
  
@@ -87,7 +94,7 @@ function getCircleIndexAtPosition(position) {
 function rotate(clickedPosition, isClockwise) {
     const rotationIndex = clickedPosition === 1 ? 0 : (clickedPosition === 3 ? 1 : 2);
     const circleIndexes = rotations[rotationIndex];
-    if (isClockwise) {
+    if (!isClockwise) {
         circleIndexes.reverse();
     }
     const circleIndicesAtPositions = circleIndexes.map(getCircleIndexAtPosition);
@@ -101,7 +108,7 @@ function rotate(clickedPosition, isClockwise) {
     circle.style.left = `${positions[circleIndexes[0]].x - 15}px`;
     circle.style.top = `${positions[circleIndexes[0]].y - 15}px`;
 
-    if (isClockwise) {
+    if (!isClockwise) {
         circleIndexes.reverse(); // Restore the original order
     }
     checkSolved();
@@ -188,7 +195,7 @@ function createArrow(index, angle) {
 
     arrow.addEventListener("click", () => {
         if (index === 1) {
-            rotate(index, angle === 360);
+            rotate(index, angle !== 360);
         } else if (index === 3) {
             rotate(index, angle !== 300);
         } else if (index === 5) {
@@ -277,6 +284,200 @@ for (let i = 0; i < positions.length; i++) {
     document.getElementById("randomize").addEventListener("click", randomizeCube);
     document.getElementById("reset").addEventListener("click", resetCube);
 </script>
+
+<!-- Apply Transformation Function -->
+<script>
+  function applyPermutationByIndices(permutation) {
+    const circles = document.getElementsByClassName("circle");
+    const tempPositions = [];
+    const circleIndices = [];
+
+    for (let i = 0; i < circles.length; i++) {
+      tempPositions.push({ x: circles[i].style.left, y: circles[i].style.top });
+      circleIndices.push(getCircleIndexAtPosition(i));
+    }
+
+    for (let i = 0; i < permutation.length; i++) {
+      const currentIndex = circleIndices[i];
+      const targetIndex = circleIndices[permutation[i]];
+
+      circles[currentIndex].style.left = tempPositions[targetIndex].x;
+      circles[currentIndex].style.top = tempPositions[targetIndex].y;
+    }
+
+    checkSolved();
+  }
+</script>
+
+
+<!-- Generate Permutation Function -->
+<script>
+  function generatePermutation(startConfig, endConfig) {
+    const permutation = [];
+
+    for (let i = 0; i < startConfig.length; i++) {
+      const startPos = endConfig.indexOf(startConfig[i]);
+      permutation.push(startPos);
+    }
+
+    return permutation;
+  }
+</script>
+
+
+
+<!-- Record Transformations -->
+
+<button id="record">Record</button>
+<button id="stop" style="display: none;">Stop</button>
+<div id="permutations" style="padding-top: 10px;"></div>
+<script>
+    let recording = false;
+    let startConfig = [];
+    let endConfig = [];
+    let pCounter = 0;
+
+    const recordButton = document.getElementById("record");
+    const stopButton = document.getElementById("stop");
+
+    recordButton.addEventListener("click", () => {
+        if (recording) return;
+        recording = true;
+        startConfig = getCurrentConfig();
+        recordButton.disabled = true;
+        stopButton.style.display = "inline";
+    });
+
+    stopButton.addEventListener("click", () => {
+        if (!recording) return;
+        recording = false;
+        endConfig = getCurrentConfig();
+        createPermutationButton(pCounter, startConfig, endConfig);
+        pCounter++;
+        recordButton.disabled = false;
+        stopButton.style.display = "none";
+    });
+
+    function getCurrentConfig() {
+        const config = [];
+        for (let i = 0; i < positions.length; i++) {
+            config.push(getCircleIndexAtPosition(i));
+        }
+        return config;
+    }
+
+  function createPermutationButton(index, startConfig, endConfig) {
+    const button = document.createElement("button");
+    button.textContent = `P${index}`;
+    button.style.marginRight = "5px";
+
+    const permutation = generatePermutation(startConfig, endConfig);
+    button.addEventListener("click", () => {
+      applyPermutationByIndices(permutation);
+    });
+
+    button.draggable = true;
+    button.addEventListener("dragstart", (event) => {
+      event.dataTransfer.setData("text/plain", event.target.id);
+    });
+
+    button.id = `permutation-${index}`;
+    document.getElementById("permutations").appendChild(button);
+  }
+</script>
+
+<!-- Bin styling -->
+<style>
+    #bin {
+        position: fixed;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        display: none;
+        font-size: 30px;
+        color: red;
+        cursor: pointer;
+    }
+</style>
+
+<!-- Drag-and-drop functionality -->
+<script>
+    const permutationsContainer = document.getElementById("permutations");
+    const bin = document.createElement("div");
+    bin.textContent = "✕";
+    bin.id = "bin";
+    document.body.appendChild(bin);
+
+    permutationsContainer.addEventListener("dragover", (event) => {
+        event.preventDefault();
+    });
+
+    permutationsContainer.addEventListener("drop", (event) => {
+        event.preventDefault();
+        const draggedId = event.dataTransfer.getData("text/plain");
+        const draggedElement = document.getElementById(draggedId);
+        const targetElement = event.target;
+
+        if (draggedElement && targetElement && targetElement.tagName === "BUTTON") {
+            const temp = document.createElement("div");
+            permutationsContainer.insertBefore(temp, draggedElement);
+            permutationsContainer.insertBefore(draggedElement, targetElement);
+            permutationsContainer.insertBefore(targetElement, temp);
+            permutationsContainer.removeChild(temp);
+        }
+    });
+
+    bin.addEventListener("dragover", (event) => {
+        event.preventDefault();
+    });
+
+    bin.addEventListener("drop", (event) => {
+        event.preventDefault();
+        const draggedId = event.dataTransfer.getData("text/plain");
+        const draggedElement = document.getElementById(draggedId);
+
+        if (draggedElement) {
+            permutationsContainer.removeChild(draggedElement);
+            bin.style.display = "none";
+        }
+    });
+
+    document.addEventListener("dragstart", (event) => {
+        if (event.target.tagName === "BUTTON") {
+            bin.style.display = "block";
+        }
+    });
+
+    document.addEventListener("dragend", (event) => {
+        if (event.target.tagName === "BUTTON") {
+            bin.style.display = "none";
+        }
+    });
+</script>
+
+<!-- Updated Drag-and-drop functionality -->
+<script>
+    let draggedElement = null;
+
+    permutationsContainer.addEventListener("dragstart", (event) => {
+        if (event.target.tagName === "BUTTON") {
+            bin.style.display = "block";
+            draggedElement = event.target;
+            setTimeout(() => {
+                event.target.style.display = "none";
+            }, 0);
+        }
+    });
+
+    document.addEventListener("dragend", (event) => {
+        if (event.target.tagName === "BUTTON") {
+            bin.style.display = "none";
+            event.target.style.display = "inline-block";
+            draggedElement = null;
+        }
+    });
+</script>
+
 
 </body>
 </html>
